@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>New Episode Watchlist</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 24px; }
+    h1 { font-size: 1.4rem; margin-bottom: 8px; }
+    #controls { margin-bottom: 12px; }
+    .ep { padding: 10px; border: 1px solid #ddd; border-radius: 10px; margin: 8px 0; }
+    .title { font-weight: 600; }
+    .new { font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+  <h1>New Episode Watchlist</h1>
+  <div id="controls">
+    <label>Show ID:</label>
+    <input id="showId" value="show-wednesday" />
+    <button id="loadBtn">Load Episodes</button>
+  </div>
+  <div id="status"></div>
+  <div id="list"></div>
+
+<script>
+const API = "https://8c7523bn7g.execute-api.us-east-1.amazonaws.com";
+
+async function load() {
+  const showId = document.getElementById('showId').value.trim();
+  const status = document.getElementById('status');
+  const list = document.getElementById('list');
+  status.textContent = "Loading...";
+  list.innerHTML = "";
+  try {
+    const url = `${API}/episodes?showId=${encodeURIComponent(showId)}`;
+    const r = await fetch(url, { method: 'GET' });
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    status.textContent = `${data.count} episode(s)`;
+    data.items.forEach(ep => {
+      const div = document.createElement('div');
+      div.className = 'ep';
+      const isNew = ep.isNew ? '⭐' : '';
+      div.innerHTML = `
+        <div class="title">${ep.title || ep.episodeId} <span class="new">${isNew}</span></div>
+        <div>ID: ${ep.episodeId}</div>
+        <div>Release: ${ep.releaseDate || ''}</div>
+      `;
+      list.appendChild(div);
+    });
+  } catch (err) {
+    status.textContent = "Error: " + err.message;
+  }
+}
+document.getElementById('loadBtn').addEventListener('click', load);
+// auto-load on open
+load();
+</script>
+</body>
+</html>
