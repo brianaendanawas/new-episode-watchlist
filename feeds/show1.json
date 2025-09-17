@@ -1,0 +1,21 @@
+{
+  "showId": "show-wednesday",
+  "episodes": [
+    { "episodeId": "s01e01", "title": "Wednesday's Child Is Full of Woe", "releaseDate": "2022-11-23" },
+    { "episodeId": "s01e02", "title": "Woe Is the Loneliest Number", "releaseDate": "2022-11-23" },
+    { "episodeId": "s01e03", "title": "Friend or Woe", "releaseDate": "2022-11-23" },
+    { "episodeId": "s01e04", "title": "Woe What a Night", "releaseDate": "2022-11-23" },
+    { "episodeId": "s01e05", "title": "You Reap What You Woe", "releaseDate": "2022-11-23" },
+    { "episodeId": "s01e06", "title": "Quid Pro Woe", "releaseDate": "2022-11-23" },
+    { "episodeId": "s01e07", "title": "If You Don’t Woe Me by Now", "releaseDate": "2022-11-23" },
+    { "episodeId": "s01e08", "title": "A Murder of Woes", "releaseDate": "2022-11-23" },
+    { "episodeId": "s02e01", "title": "Here We Woe Again", "releaseDate": "2025-08-06" },
+    { "episodeId": "s02e02", "title": "The Devil You Woe", "releaseDate": "2025-08-06" },
+    { "episodeId": "s02e03", "title": "Call of the Woe", "releaseDate": "2025-08-06" },
+    { "episodeId": "s02e04", "title": "If These Woes Could Talk", "releaseDate": "2025-08-06" },
+    { "episodeId": "s02e05", "title": "Hyde and Woe Seek", "releaseDate": "2025-09-03" },
+    { "episodeId": "s02e06", "title": "Woe Thyself", "releaseDate": "2025-09-03" },
+    { "episodeId": "s02e07", "title": "Woe Me the Money", "releaseDate": "2025-09-16" },
+    { "episodeId": "s02e08", "title": "This Means Woe", "releaseDate": "2025-09-16" }
+  ]
+}
