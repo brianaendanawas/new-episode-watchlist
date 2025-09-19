@@ -20,42 +20,111 @@
     <input id="showId" value="show-wednesday" />
     <button id="loadBtn">Load Episodes</button>
   </div>
+
+  <!-- Search bar -->
+  <div style="margin: 20px 0;">
+    <input type="text" id="searchBox" placeholder="Search episodes..." style="padding:8px; width: 250px;">
+  </div>
+
+  <ul id="episodes"></ul>
+
+  <footer style="text-align:center; margin-top:20px; font-size:14px; color:gray;">
+    Last Updated: <span id="lastUpdated"></span>
+  </footer>
+
+  <script src="app.js"></script>
+
   <div id="status"></div>
   <div id="list"></div>
 
 <script>
 const API = "https://8c7523bn7g.execute-api.us-east-1.amazonaws.com";
 
+let allEpisodes = []; // hold the full list for searching
+
+function render(items) {
+  const list = document.getElementById('list');
+  list.innerHTML = "";
+  if (!items || items.length === 0) {
+    list.innerHTML = '<div style="color:#666;">No matches.</div>';
+    return;
+  }
+  items.forEach(ep => {
+    const div = document.createElement('div');
+    div.className = 'ep';
+    const isNew = ep.isNew ? '⭐' : '';
+    div.innerHTML = `
+      <div class="title">${ep.title || ep.episodeId} <span class="new">${isNew}</span></div>
+      <div>ID: ${ep.episodeId || ''}</div>
+      <div>Release: ${ep.releaseDate || ''}</div>
+    `;
+    list.appendChild(div);
+  });
+}
+
 async function load() {
   const showId = document.getElementById('showId').value.trim();
   const status = document.getElementById('status');
-  const list = document.getElementById('list');
   status.textContent = "Loading...";
-  list.innerHTML = "";
+  document.getElementById('list').innerHTML = "";
   try {
     const url = `${API}/episodes?showId=${encodeURIComponent(showId)}`;
-    const r = await fetch(url, { method: 'GET' });
-    if(!r.ok) throw new Error("HTTP " + r.status);
+    const r = await fetch(url, { method: 'GET', cache: 'no-store' });
+    if (!r.ok) throw new Error("HTTP " + r.status);
     const data = await r.json();
-    status.textContent = `${data.count} episode(s)`;
-    data.items.forEach(ep => {
-      const div = document.createElement('div');
-      div.className = 'ep';
-      const isNew = ep.isNew ? '⭐' : '';
-      div.innerHTML = `
-        <div class="title">${ep.title || ep.episodeId} <span class="new">${isNew}</span></div>
-        <div>ID: ${ep.episodeId}</div>
-        <div>Release: ${ep.releaseDate || ''}</div>
-      `;
-      list.appendChild(div);
-    });
+
+    // Support your existing shape: { count, items: [...] }
+    allEpisodes = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : []);
+    const count = data.count ?? allEpisodes.length;
+
+    status.textContent = `${count} episode(s)`;
+    render(allEpisodes);
   } catch (err) {
     status.textContent = "Error: " + err.message;
   }
 }
+
+function setupSearch() {
+  const searchBox = document.getElementById('searchBox');
+  if (!searchBox) return; // in case it's missing
+
+  searchBox.addEventListener('input', () => {
+    const q = searchBox.value.trim().toLowerCase();
+    if (!q) {
+      render(allEpisodes);
+      return;
+    }
+    const filtered = allEpisodes.filter(ep => {
+      const t = (ep.title || '').toLowerCase();
+      const id = (ep.episodeId || '').toLowerCase();
+      const rel = (ep.releaseDate || '').toLowerCase();
+      return t.includes(q) || id.includes(q) || rel.includes(q);
+    });
+    render(filtered);
+  });
+}
+
 document.getElementById('loadBtn').addEventListener('click', load);
-// auto-load on open
+
+// init
+setupSearch();
 load();
 </script>
+
+
+<footer style="text-align:center; margin-top:20px; font-size:14px; color:gray;">
+  Last Updated: <span id="lastUpdated"></span>
+</footer>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const el = document.getElementById("lastUpdated");
+    if (el) {
+      const now = new Date();
+      el.textContent = now.toLocaleString();
+    }
+  });
+</script>
+
 </body>
 </html>
