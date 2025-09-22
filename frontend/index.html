@@ -26,6 +26,45 @@
     <input type="text" id="searchBox" placeholder="Search episodes..." style="padding:8px; width: 250px;">
   </div>
 
+  <!-- Filters -->
+  <div style="margin: 8px 0;">
+    <label style="margin-right:16px;">
+      <input type="checkbox" id="hideWatched"> Hide watched
+    </label>
+    <label>
+      <input type="checkbox" id="onlyNew"> Only NEW (⭐)
+    </label>
+  </div>
+
+  <!-- Ratings & Sort -->
+  <div style="margin: 8px 0;">
+    <label style="margin-right:16px;">
+      Min rating:
+      <select id="minRating">
+        <option value="0">0+</option>
+        <option value="1">1+</option>
+        <option value="2">2+</option>
+        <option value="3">3+</option>
+        <option value="4">4+</option>
+        <option value="5">5+</option>
+        <option value="6">6+</option>
+        <option value="7">7+</option>
+        <option value="8">8+</option>
+        <option value="9">9+</option>
+        <option value="10">10</option>
+      </select>
+    </label>
+    <label>
+      Sort by:
+      <select id="sortBy">
+        <option value="releaseDesc">Release (newest)</option>
+        <option value="titleAsc">Title (A–Z)</option>
+        <option value="ratingDesc">Rating (high→low)</option>
+        <option value="newFirst">NEW ⭐ first</option>
+      </select>
+    </label>
+  </div>
+
   <ul id="episodes"></ul>
 
   <footer style="text-align:center; margin-top:20px; font-size:14px; color:gray;">
@@ -40,8 +79,42 @@
 <script>
 const API = "https://8c7523bn7g.execute-api.us-east-1.amazonaws.com";
 
-let allEpisodes = []; // hold the full list for searching
+let allEpisodes = []; // full list from API
+let watched = new Set(); // episodeIds the user marked watched (per showId)
 
+let ratings = {}; // { episodeId: number } for current show
+
+function ratingsKey(showId){ return `ratings:${showId}`; }
+function loadRatings(showId){
+  try { ratings = JSON.parse(localStorage.getItem(ratingsKey(showId)) || "{}"); }
+  catch { ratings = {}; }
+}
+function saveRatings(showId){
+  localStorage.setItem(ratingsKey(showId), JSON.stringify(ratings));
+}
+function getRating(epId){
+  const v = ratings[epId];
+  return (typeof v === "number" && v >= 1 && v <= 10) ? v : 0;
+}
+
+
+// --- localStorage helpers ---
+function lsKey(showId){ return `watched:${showId}`; }
+function loadWatched(showId){
+  try { watched = new Set(JSON.parse(localStorage.getItem(lsKey(showId))||"[]")); }
+  catch { watched = new Set(); }
+}
+function saveWatched(showId){
+  localStorage.setItem(lsKey(showId), JSON.stringify([...watched]));
+}
+function saveLastShowId(showId){
+  localStorage.setItem("lastShowId", showId);
+}
+function getLastShowId(){
+  return localStorage.getItem("lastShowId") || "show-wednesday";
+}
+
+// --- render ---
 function render(items) {
   const list = document.getElementById('list');
   list.innerHTML = "";
@@ -49,72 +122,202 @@ function render(items) {
     list.innerHTML = '<div style="color:#666;">No matches.</div>';
     return;
   }
+  const showId = document.getElementById('showId').value.trim();
+
   items.forEach(ep => {
     const div = document.createElement('div');
     div.className = 'ep';
     const isNew = ep.isNew ? '⭐' : '';
+    const isWatched = watched.has(ep.episodeId);
+
+    const currentRating = getRating(ep.episodeId);
     div.innerHTML = `
-      <div class="title">${ep.title || ep.episodeId} <span class="new">${isNew}</span></div>
+      <div class="title">
+        ${ep.title || ep.episodeId} <span class="new">${isNew}</span>
+      </div>
       <div>ID: ${ep.episodeId || ''}</div>
       <div>Release: ${ep.releaseDate || ''}</div>
+
+      <div style="margin:8px 0;">
+        <label>
+          Rating (1–10):
+          <input type="range" min="1" max="10" value="${currentRating || 5}" step="1"
+                 class="ratingSlider" data-id="${ep.episodeId}" style="vertical-align:middle; width:180px; margin:0 8px;">
+        </label>
+        <span class="ratingValue" data-id="${ep.episodeId}" style="display:inline-block; width:20px; text-align:center;">
+          ${currentRating || '-'}
+        </span>
+        <button class="clearRatingBtn" data-id="${ep.episodeId}" style="margin-left:8px;">Clear</button>
+      </div>
+
+      <button class="watchBtn" data-id="${ep.episodeId}">
+        ${isWatched ? 'Unwatch' : 'Mark as watched'}
+      </button>
     `;
+
     list.appendChild(div);
   });
+
+  // attach button handlers
+  list.querySelectorAll('.watchBtn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const showId = document.getElementById('showId').value.trim();
+      const id = e.currentTarget.getAttribute('data-id');
+      if (watched.has(id)) watched.delete(id); else watched.add(id);
+      saveWatched(showId);
+      applyFiltersAndRender(); // re-render with current filters
+    });
+  });
+
+  // rating slider handlers
+  list.querySelectorAll('.ratingSlider').forEach(sl => {
+    sl.addEventListener('input', (e) => {
+      const showId = document.getElementById('showId').value.trim();
+      const epId = e.currentTarget.getAttribute('data-id');
+      const val = parseInt(e.currentTarget.value, 10);
+      ratings[epId] = val;
+      saveRatings(showId);
+      // update visible number beside the slider
+      const num = list.querySelector(`.ratingValue[data-id="${epId}"]`);
+      if (num) num.textContent = String(val);
+      applyFiltersAndRender(); // re-apply min rating / sort immediately
+    });
+  });
+
+  // clear rating
+  list.querySelectorAll('.clearRatingBtn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const showId = document.getElementById('showId').value.trim();
+      const epId = e.currentTarget.getAttribute('data-id');
+      delete ratings[epId];
+      saveRatings(showId);
+      applyFiltersAndRender();
+    });
+  });
+
 }
 
-async function load() {
-  const showId = document.getElementById('showId').value.trim();
-  const status = document.getElementById('status');
-  status.textContent = "Loading...";
-  document.getElementById('list').innerHTML = "";
-  try {
-    const url = `${API}/episodes?showId=${encodeURIComponent(showId)}`;
-    const r = await fetch(url, { method: 'GET', cache: 'no-store' });
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const data = await r.json();
+// --- search + filters ---
+function applyFiltersAndRender(){
+  const q = (document.getElementById('searchBox')?.value || "").trim().toLowerCase();
+  const hideWatched = document.getElementById('hideWatched').checked;
+  const onlyNew = document.getElementById('onlyNew').checked;
 
-    // Support your existing shape: { count, items: [...] }
-    allEpisodes = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : []);
-    const count = data.count ?? allEpisodes.length;
+  const minRating = parseInt(document.getElementById('minRating').value, 10) || 0;
+  const sortBy = document.getElementById('sortBy').value;
 
-    status.textContent = `${count} episode(s)`;
-    render(allEpisodes);
-  } catch (err) {
-    status.textContent = "Error: " + err.message;
-  }
-}
+  // persist UI prefs (so they stick on refresh)
+  localStorage.setItem("minRating", String(minRating));
+  localStorage.setItem("sortBy", sortBy);
 
-function setupSearch() {
-  const searchBox = document.getElementById('searchBox');
-  if (!searchBox) return; // in case it's missing
+  let items = allEpisodes.slice();
 
-  searchBox.addEventListener('input', () => {
-    const q = searchBox.value.trim().toLowerCase();
-    if (!q) {
-      render(allEpisodes);
-      return;
-    }
-    const filtered = allEpisodes.filter(ep => {
+  if (q) {
+    items = items.filter(ep => {
       const t = (ep.title || '').toLowerCase();
       const id = (ep.episodeId || '').toLowerCase();
       const rel = (ep.releaseDate || '').toLowerCase();
       return t.includes(q) || id.includes(q) || rel.includes(q);
     });
-    render(filtered);
+  }
+  if (hideWatched) {
+    items = items.filter(ep => !watched.has(ep.episodeId));
+  }
+  if (onlyNew) {
+    items = items.filter(ep => ep.isNew);
+  }
+  if (minRating > 0) {
+    items = items.filter(ep => (getRating(ep.episodeId) || 0) >= minRating);
+  }
+
+    items.sort((a, b) => {
+    const ra = getRating(a.episodeId) || 0;
+    const rb = getRating(b.episodeId) || 0;
+    const da = (a.releaseDate || '');
+    const db = (b.releaseDate || '');
+
+    switch (sortBy) {
+      case 'ratingDesc':
+        return rb - ra || (db > da ? 1 : db < da ? -1 : 0);
+      case 'titleAsc':
+        return (a.title || '').localeCompare(b.title || '');
+      case 'newFirst':
+        // NEWs first, then release desc
+        const na = a.isNew ? 1 : 0;
+        const nb = b.isNew ? 1 : 0;
+        if (nb !== na) return nb - na;
+        return (db > da ? 1 : db < da ? -1 : 0);
+      case 'releaseDesc':
+      default:
+        return (db > da ? 1 : db < da ? -1 : 0);
+    }
   });
+
+  render(items);
 }
 
-document.getElementById('loadBtn').addEventListener('click', load);
+// --- load from API ---
+async function load() {
+  const showId = document.getElementById('showId').value.trim();
+  const status = document.getElementById('status');
+  const list = document.getElementById('list');
+  status.textContent = "Loading...";
+  list.innerHTML = "";
 
-// init
-setupSearch();
-load();
+  saveLastShowId(showId);
+  loadWatched(showId);
+
+  loadRatings(showId);
+
+  // restore saved UI prefs
+  const savedMin = localStorage.getItem("minRating") ?? "0";
+  const savedSort = localStorage.getItem("sortBy") ?? "releaseDesc";
+  document.getElementById("minRating").value = savedMin;
+  document.getElementById("sortBy").value = savedSort;
+
+
+  try {
+    const url = `${API}/episodes?showId=${encodeURIComponent(showId)}`;
+    const r = await fetch(url, { method: 'GET', cache: 'no-store' });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    
+    const items = Array.isArray(data?.items) ? data.items
+            : Array.isArray(data)        ? data
+            : [];
+
+    // Expecting { count, items: [...] }
+    allEpisodes = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : []);
+    const count = data.count ?? allEpisodes.length;
+
+    status.textContent = `${count} episode(s)`;
+    applyFiltersAndRender();
+  } catch (err) {
+    status.textContent = "Error: " + err.message;
+  }
+}
+
+// --- init ---
+document.addEventListener('DOMContentLoaded', () => {
+  // preload last showId
+  document.getElementById('showId').value = getLastShowId();
+
+  // wire controls
+  document.getElementById('loadBtn').addEventListener('click', load);
+
+  const sb = document.getElementById('searchBox');
+  if (sb) sb.addEventListener('input', applyFiltersAndRender);
+
+  document.getElementById('hideWatched').addEventListener('change', applyFiltersAndRender);
+  document.getElementById('onlyNew').addEventListener('change', applyFiltersAndRender);
+
+  document.getElementById('minRating').addEventListener('change', applyFiltersAndRender);
+  document.getElementById('sortBy').addEventListener('change', applyFiltersAndRender);
+
+  // initial load
+  load();
+});
 </script>
-
-
-<footer style="text-align:center; margin-top:20px; font-size:14px; color:gray;">
-  Last Updated: <span id="lastUpdated"></span>
-</footer>
 
 <script>
   document.addEventListener("DOMContentLoaded", () => {
