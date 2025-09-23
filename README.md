@@ -35,3 +35,6 @@ API Lambda (`GET /episodes`) reads `feeds/` + `flags/` and the page shows ⭐ fo
 - `FLAGS_PREFIX = flags/`  
 - `ALLOWED_ORIGIN = https://d3nygn7m3cuned.cloudfront.net`  
 - `ALIASES = {"show-wednesday":"show1"}`
+
+## Demo
+![Website screenshot](images/episode-website-screenshot.png)
